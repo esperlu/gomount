@@ -21,7 +21,7 @@ ubnt,/home/jeanluc/my-mnt/ubnt,192.168.0.201,2211
 ```
 
 ## Usage
-gomount [options]
+`$ gomount [options]`
 
 ### Options
 * -t Change default timeout for ping (150 ms).
