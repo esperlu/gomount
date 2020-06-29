@@ -59,3 +59,5 @@ arsule-web           dial tcp 192.168.0.153:221: i/o timeout
 arsule-jeanluc       dial tcp 192.168.0.153:221: i/o timeout
 rpi-2                dial tcp 192.168.0.156:22: i/o timeout
 ```
+
+#### Author: Jean-Luc Lacroix
