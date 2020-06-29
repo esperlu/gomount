@@ -24,9 +24,10 @@ type server struct {
 	Port string
 }
 
+// Path to config file and version number
 const (
-	ver      = "1.0_06-2020"
 	confFile = "/home/jeanluc/.config/gomount/gomount.conf"
+	ver      = "v1.0"
 )
 
 // Flag debug
@@ -152,7 +153,7 @@ func main() {
 		}(srv)
 
 	}
-	// Waiting for all the routines to finish
+	// Wait for all the routines to finish
 	wg.Wait()
 
 	fmt.Printf("\n%s %s | %.3f sec.\n\n", path.Base(os.Args[0]), ver, time.Since(startTime).Seconds())
