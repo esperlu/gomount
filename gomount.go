@@ -24,10 +24,11 @@ type server struct {
 	Port string
 }
 
-// Path to config file and version number
+// Path to config file, mount info file and version number
 const (
-	confFile = "/home/jeanluc/.config/gomount/gomount.conf"
-	ver      = "v1.0"
+	confFile      = "/home/jeanluc/.config/gomount/gomount.conf"
+	mountInfoFile = "/proc/self/mountinfo"
+	ver           = "v1.0"
 )
 
 // Flag debug
@@ -46,7 +47,6 @@ func init() {
 }
 
 func main() {
-
 	startTime := time.Now()
 
 	// Open and read config file
@@ -60,23 +60,22 @@ func main() {
 	}
 	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
-	var host []server
-	var lineNumber int
-
+	// Show conf file if requested
 	if *flagShowConf {
 		fmt.Printf("\n%s\n\n", confFile)
 	}
 
+	// Scan through config file and process the pounts
+	var host []server
+	var lineNumber int
+	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		lineNumber++
-
 		// Show config file
 		if *flagShowConf {
 			fmt.Println(scanner.Text())
 			continue
 		}
-
 		// Skip commented lines
 		confLine := strings.TrimSpace(scanner.Text())
 		if strings.HasPrefix(confLine, "#") {
@@ -92,7 +91,6 @@ func main() {
 			fmt.Printf("\nERROR: Port number empty or not INT on line %d:\n --> %s\n\"%s\" not numerical.\n\n", lineNumber, confLine, fields[3])
 			continue
 		}
-
 		//  Store config file lines into []struc
 		host = append(host, server{
 			Name: fields[0],
@@ -104,24 +102,24 @@ func main() {
 	}
 
 	// Get list of already mounted hosts
-	data, _ := ioutil.ReadFile("/proc/self/mountinfo")
+	data, _ := ioutil.ReadFile(mountInfoFile)
 	mountInfo := string(data)
 
+	// launch processes in goroutines using a closure func and print output
 	fmt.Println()
 	var wg sync.WaitGroup
 	for _, srv := range host {
-
-		// launch processes in goroutines in a closure func
 		wg.Add(1)
 		go func(srv server) {
 			defer wg.Done()
+
 			// check if already mounted in /proc/self/mountinfo
 			if strings.Contains(mountInfo, srv.Mnt) {
 				fmt.Printf("%-20s %-15s\n", srv.Name, "already mounted")
 				return
 			}
 
-			// check if port is given
+			// check if port is given in config file
 			if srv.Port == "" {
 				fmt.Printf("%-20s no port given\n", srv.Name)
 				return
@@ -138,6 +136,7 @@ func main() {
 				return
 			}
 
+			// execute the mount(8)
 			cmd := exec.Command("mount", srv.Mnt)
 			output, err := cmd.CombinedOutput()
 			if err != nil {
@@ -159,6 +158,8 @@ func main() {
 	fmt.Printf("\n%s %s | %.3f sec.\n\n", path.Base(os.Args[0]), ver, time.Since(startTime).Seconds())
 }
 
+// Functions
+
 // goping
 func goping(protocole string, host string, port string, t time.Duration) error {
 	t = time.Duration(t * time.Millisecond)
@@ -166,6 +167,7 @@ func goping(protocole string, host string, port string, t time.Duration) error {
 	return err
 }
 
+// checkeErr check err and log.Fatal if any
 func checkErr(err error) {
 	if err != nil {
 		log.Fatal(err)
