@@ -24,10 +24,10 @@ ubnt,/home/jeanluc/my-mnt/ubnt,192.168.0.201,2211
 `$ gomount [options]`
 
 ### Options
-* -t Change default timeout for ping (150 ms).
-* -v Increased verbosity by showing OS error messages.
-* -c Show config file and its location.
-* -h This help screen.
+* `-t` Change default timeout for ping (150 ms).
+* `-v` Increased verbosity by showing OS error messages.
+* `-c` Show config file and its location.
+* `-h` This help screen.
 
 ## Typical output
 ```
