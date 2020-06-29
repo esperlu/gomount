@@ -6,6 +6,8 @@ This go program executes  `exec.Command(mount(8))` rather than the mount(2) used
 Linux only. Could possibly also work on OS-X. Not tested.
 
 ## config file
+You first need to make a config file and set its full access path/name into the constant `confFile` arround line 29 of the code.
+
 It consists of 4 fields, comma separated lines with the following pattern:
 ```
 [short name],[mount point as defined in fstab],[host name or IP address],[port to ping]
