@@ -1,12 +1,14 @@
 # gomount
-Fast user mount of multiple remote mount points skipping the responding servers not responding to http probe (ping-ish). Mount points need to be configured in `fstab`. Speed is achieved by using go's concurrency routines to send http probes to the targeted servers.
+Fast user mount of multiple remote mount points skipping the responding servers not responding to http probe (ping-ish). Mount points need to be configured in `fstab`. Speed is achieved by using go's routines to concurrently send http probes to the targeted servers.
+
+This go program executes  `exec.Command(mount(8))` rather than the mount(2) used by `syscall.Mount()` because mount(2) requires root privileges.
 
 Linux only. Could possibly also work on OS-X. Not tested.
 
 ## config file
-It consists of 4 fields, comma separated lines with the fommowing pattern:
+It consists of 4 fields, comma separated lines with the following pattern:
 ```
-[short name] [mount point as defined in fstab] [host name or IP address]  [port to ping]
+[short name],[mount point as defined in fstab],[host name or IP address],[port to ping]
 ```
 Commented out lines will be ignored.
 
