@@ -1,3 +1,6 @@
+// Package gomount mounts remote servers on local mount points defined in `fstab`
+// Mount points are read from a user config file. Run `$ gomount -h` for more details.
+//
 package main
 
 import (
@@ -59,7 +62,7 @@ func main() {
 	}
 	defer f.Close()
 
-	// validate config file. Iff err, terminate main()
+	// validate config file. If err, terminate main()
 	err = validateConf(f)
 	if err != nil {
 		return
@@ -127,7 +130,7 @@ func main() {
 
 // Functions
 
-// goping
+// goping http ping to check if a server is up
 func goping(protocole string, host string, port string, t time.Duration) error {
 	t = time.Duration(t * time.Millisecond)
 	_, err := net.DialTimeout(protocole, host+":"+port, t)
@@ -139,34 +142,6 @@ func checkErr(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-// readConfig reads the config file. Returns list of servers to mount and mount points.
-func readConfig(f *os.File) []server {
-	var host []server
-
-	// reset file seek head at bebinning of file (f *os.File pointer may be used by other func)
-	defer f.Seek(0, 0)
-
-	// Scan through config file and process the mounts
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		confLine := strings.TrimSpace(scanner.Text())
-		fields := strings.Split(confLine, ",")
-		// Skip commented lines
-		if strings.HasPrefix(confLine, "#") || confLine == "" {
-			continue
-		}
-
-		//  Store config file lines into []struc
-		host = append(host, server{
-			Name: fields[0],
-			Mnt:  fields[1],
-			Host: fields[2],
-			Port: fields[3],
-		})
-	}
-	return host
 }
 
 // validateConf validates the config file and print errors
@@ -229,4 +204,32 @@ func validateConf(f *os.File) error {
 		return fmt.Errorf("Conf file not valid")
 	}
 	return nil
+}
+
+// readConfig reads the config file. Returns list of servers to mount and mount points.
+func readConfig(f *os.File) []server {
+	var host []server
+
+	// reset file seek head at bebinning of file (f *os.File pointer may be used by other func)
+	defer f.Seek(0, 0)
+
+	// Scan through config file and process the mounts
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		confLine := strings.TrimSpace(scanner.Text())
+		fields := strings.Split(confLine, ",")
+		// Skip commented lines
+		if strings.HasPrefix(confLine, "#") || confLine == "" {
+			continue
+		}
+
+		//  Store config file lines into []struc
+		host = append(host, server{
+			Name: fields[0],
+			Mnt:  fields[1],
+			Host: fields[2],
+			Port: fields[3],
+		})
+	}
+	return host
 }
