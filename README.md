@@ -12,7 +12,7 @@ It consists of 4 fields, comma separated lines with the following pattern:
 ```
 [short name],[mount point as defined in fstab],[host name or IP address],[port to ping]
 ```
-Commented out lines will be ignored.
+Commented out lines will be ignored and config file will be tested for validity at run time.
 
 ### Example
 ```
@@ -29,8 +29,7 @@ ubnt,/home/jeanluc/my-mnt/ubnt,192.168.0.201,2211
 
 ### Options
 * `-t` Change default timeout for ping (150 ms).
-* `-v` Increased verbosity by showing OS error messages.
-* `-c` Show config file and its location.
+* `-v` Increase verbosity by showing error messages.
 * `-h` This help screen.
 
 ## Typical output
