@@ -62,7 +62,7 @@ func main() {
 	}
 	defer f.Close()
 
-	// validate config file. If err, terminate main()
+	// validate config file. If err, show error and terminate main()
 	err = validateConf(f)
 	if err != nil {
 		return
@@ -83,19 +83,19 @@ func main() {
 		go func(srv server) {
 			defer wg.Done()
 
-			// check if already mounted in /proc/self/mountinfo
+			// if already mounted in /proc/self/mountinfo --> exit goroutine
 			if strings.Contains(mountInfo, srv.Mnt) {
 				fmt.Printf("%-20s %-15s\n", srv.Name, "already mounted")
 				return
 			}
 
-			// check if port is given in config file
+			// if no port is given in config file --> exit goroutine
 			if srv.Port == "" {
 				fmt.Printf("%-20s no port given\n", srv.Name)
 				return
 			}
 
-			// check if host is responding on TCP probe (netcat in go)
+			// if host is not responding on TCP probe (netcat in go) --> exit goroutine
 			err := goping("tcp", srv.Host, srv.Port, time.Duration(*flagTimeout))
 			if err != nil {
 				errMsg := "not responding"
@@ -147,7 +147,7 @@ func checkErr(err error) {
 // validateConf validates the config file and print errors
 func validateConf(f *os.File) error {
 
-	// reset file seek head at bebinning of file (f *os.File pointer may be used by other func)
+	// reset file seek head at bebinning of file (f *os.File pointer may be used by another func)
 	defer f.Seek(0, 0)
 
 	// Scan through config file and print lines
@@ -206,11 +206,11 @@ func validateConf(f *os.File) error {
 	return nil
 }
 
-// readConfig reads the config file. Returns list of servers to mount and mount points.
+// readConfig reads the config file. Returns list of servers to mount and their local mount points.
 func readConfig(f *os.File) []server {
 	var host []server
 
-	// reset file seek head at bebinning of file (f *os.File pointer may be used by other func)
+	// reset file seek head at bebinning of file (*os.File pointer may be used by another func)
 	defer f.Seek(0, 0)
 
 	// Scan through config file and process the mounts
