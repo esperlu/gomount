@@ -51,34 +51,26 @@ func init() {
 func main() {
 	startTime := time.Now()
 
-	// Open and read config file
-	f, err := os.Open(confFile)
+	// open, read and validate config file. If err, show error and terminate main()
+	// if no errors, store all config fields in a []server struct
+	hosts, err := readConfig(confFile)
 	if err != nil {
-		fmt.Printf(
-			"\nCould not find the config file: %s\nChange the value of the \"confile\" const in code\n\n",
-			confFile,
-		)
+		fmt.Printf("\n %s\n\n", err)
 		return
 	}
-	defer f.Close()
-
-	// validate config file. If err, show error and terminate main()
-	err = validateConf(f)
-	if err != nil {
-		return
-	}
-
-	// read config and mount
-	host := readConfig(f)
 
 	// Get list of already mounted hosts
-	data, _ := ioutil.ReadFile(mountInfoFile)
-	mountInfo := string(data)
+	m, err := ioutil.ReadFile(mountInfoFile)
+	if err != nil {
+		fmt.Printf("\n Could not find: %s\n Check the path and file name in the const block.\n\n", mountInfoFile)
+		return
+	}
+	mountInfo := string(m)
 
 	// launch processes in goroutines
 	fmt.Println()
 	var wg sync.WaitGroup
-	for _, srv := range host {
+	for _, srv := range hosts {
 		wg.Add(1)
 		go func(srv server) {
 			defer wg.Done()
@@ -144,35 +136,45 @@ func checkErr(err error) {
 	}
 }
 
-// validateConf validates the config file and print errors
-func validateConf(f *os.File) error {
+// readConfig validates and process the config file and print errors
+func readConfig(confFile string) ([]server, error) {
+	var hosts []server
 
-	// reset file seek head at bebinning of file (f *os.File pointer may be used by another func)
-	defer f.Seek(0, 0)
+	// Open and read config file
+	f, err := os.Open(confFile)
+	if err != nil {
+		return hosts, fmt.Errorf("Could not find the config file: %s\n Check the path and file name in the const block", confFile)
+	}
+	defer f.Close()
 
-	// Scan through config file and print lines
+	// Scan through config file
 	var lineNumber int
 	var sErr []error
-	var allLines string
+	var numberedLines string
+
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		lineNumber++
 		// read line from scanner
-		confLine := strings.TrimSpace(scanner.Text())
-		allLines += fmt.Sprintf("%3d: %s\n", lineNumber, confLine)
+		l := strings.TrimSpace(scanner.Text())
+		numberedLines += fmt.Sprintf("%3d: %s\n", lineNumber, l)
+
 		// skip empty and commented out lines
-		if strings.HasPrefix(confLine, "#") || confLine == "" {
+		if strings.HasPrefix(l, "#") || l == "" {
 			continue
 		}
-		fields := strings.Split(confLine, ",")
+
+		// parse line
+		fields := strings.Split(l, ",")
+
 		// Missing fields
 		if len(fields) < 4 {
-			sErr = append(sErr, fmt.Errorf("%3d: field missing expecting 4 fields, seen %d", lineNumber, len(fields)))
+			sErr = append(sErr, fmt.Errorf("%3d: field(s) missing expecting 4 fields, seen %d", lineNumber, len(fields)))
 			continue
 		}
 		// empty fields
 		if fields[0] == "" || fields[1] == "" || fields[2] == "" || fields[3] == "" {
-			sErr = append(sErr, fmt.Errorf("%3d: field missing or empty. Need 4 fields", lineNumber))
+			sErr = append(sErr, fmt.Errorf("%3d: field(s) missing or empty. Need 4 fields", lineNumber))
 			continue
 		}
 		// mount point not a dir
@@ -181,55 +183,39 @@ func validateConf(f *os.File) error {
 			continue
 		}
 		// port to ping not int number
-		if _, e := strconv.Atoi(fields[3]); e != nil {
+		if _, err := strconv.Atoi(fields[3]); err != nil {
 			sErr = append(sErr, fmt.Errorf("%3d: port number empty or not valid: \"%s\" not numerical", lineNumber, fields[3]))
 			continue
 		}
 
+		// No error for this line. Store fields in a []server struct and loop for next line
+		if len(sErr) == 0 {
+			hosts = append(hosts, server{
+				Name: fields[0],
+				Mnt:  fields[1],
+				Host: fields[2],
+				Port: fields[3],
+			})
+		}
+
 	}
 
-	// if errors seen, print them along with config file if verbosity option -v is set
+	// if errors were seen in above loop, print them along with config file if verbosity option -v (verbosity) is set
 	if len(sErr) > 0 {
 		if *flagVerbosity {
-			fmt.Println("")
-			fmt.Println(allLines)
-			fmt.Println("Errors:")
-			for _, e := range sErr {
-				fmt.Printf("%v\n", e)
+			var e string
+			for _, v := range sErr {
+				e += fmt.Sprintf("%v\n", v)
 			}
-			fmt.Println("")
-		} else {
-			fmt.Printf("\nError reading config file, aborting. Use option -v to show error(s).\n\n")
+			return hosts, fmt.Errorf("\n%s\nErrors:\n%s", numberedLines, e)
+
 		}
-		return fmt.Errorf("Conf file not valid")
+		return hosts, fmt.Errorf("error reading config file, aborting. Use option -v to show error(s)")
 	}
-	return nil
-}
 
-// readConfig reads the config file. Returns list of servers to mount and their local mount points.
-func readConfig(f *os.File) []server {
-	var host []server
-
-	// reset file seek head at bebinning of file (*os.File pointer may be used by another func)
-	defer f.Seek(0, 0)
-
-	// Scan through config file and process the mounts
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		confLine := strings.TrimSpace(scanner.Text())
-		fields := strings.Split(confLine, ",")
-		// Skip commented lines
-		if strings.HasPrefix(confLine, "#") || confLine == "" {
-			continue
-		}
-
-		//  Store config file lines into []struc
-		host = append(host, server{
-			Name: fields[0],
-			Mnt:  fields[1],
-			Host: fields[2],
-			Port: fields[3],
-		})
+	if len(hosts) == 0 {
+		return hosts, fmt.Errorf("No hosts found in config file. Nothing to mount")
 	}
-	return host
+
+	return hosts, nil
 }
