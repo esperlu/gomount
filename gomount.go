@@ -136,7 +136,7 @@ func checkErr(err error) {
 	}
 }
 
-// readConfig validates and process the config file and print errors
+// readConfig validates and process the config file.
 func readConfig(confFile string) ([]server, error) {
 	var hosts []server
 
