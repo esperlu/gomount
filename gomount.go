@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -75,19 +74,13 @@ func main() {
 		go func(srv server) {
 			defer wg.Done()
 
-			// if already mounted in /proc/self/mountinfo --> exit goroutine
+			// already mounted in /proc/self/mountinfo --> exit goroutine
 			if strings.Contains(mountInfo, srv.Mnt) {
 				fmt.Printf("%-20s %-15s\n", srv.Name, "already mounted")
 				return
 			}
 
-			// if no port is given in config file --> exit goroutine
-			if srv.Port == "" {
-				fmt.Printf("%-20s no port given\n", srv.Name)
-				return
-			}
-
-			// if host is not responding on TCP probe (netcat in go) --> exit goroutine
+			// host is not responding on TCP probe --> exit goroutine
 			err := goping("tcp", srv.Host, srv.Port, time.Duration(*flagTimeout))
 			if err != nil {
 				errMsg := "not responding"
@@ -117,23 +110,19 @@ func main() {
 	// Wait for all the routines to finish
 	wg.Wait()
 
+	// print timing
 	fmt.Printf("\n%s %s | %.3f sec.\n\n", path.Base(os.Args[0]), ver, time.Since(startTime).Seconds())
 }
 
+//
 // Functions
+//
 
 // goping http ping to check if a server is up
 func goping(protocole string, host string, port string, t time.Duration) error {
 	t = time.Duration(t * time.Millisecond)
 	_, err := net.DialTimeout(protocole, host+":"+port, t)
 	return err
-}
-
-// checkeErr check err and log.Fatal if any
-func checkErr(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
 }
 
 // readConfig validates and process the config file.
