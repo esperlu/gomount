@@ -139,6 +139,9 @@ func checkErr(err error) {
 // readConfig validates and process the config file.
 func readConfig(confFile string) ([]server, error) {
 	var hosts []server
+	var lineNumber int
+	var sErr []error
+	var numberedLines string
 
 	// Open and read config file
 	f, err := os.Open(confFile)
@@ -148,10 +151,6 @@ func readConfig(confFile string) ([]server, error) {
 	defer f.Close()
 
 	// Scan through config file
-	var lineNumber int
-	var sErr []error
-	var numberedLines string
-
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		lineNumber++
