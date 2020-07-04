@@ -145,10 +145,10 @@ func readConfig(confFile string) ([]server, error) {
 
 	// Open and read config file
 	f, err := os.Open(confFile)
+	defer f.Close()
 	if err != nil {
 		return hosts, fmt.Errorf("Could not find the config file: %s\n Check the path and file name in the const block", confFile)
 	}
-	defer f.Close()
 
 	// Scan through config file
 	scanner := bufio.NewScanner(f)
