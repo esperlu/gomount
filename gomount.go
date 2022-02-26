@@ -18,14 +18,6 @@ import (
 	"time"
 )
 
-// server
-type server struct {
-	Name string
-	Mnt  string
-	Host string
-	Port string
-}
-
 // Path to config file, mount info file and version number
 const (
 	confFile      = "/home/jeanluc/.config/gomount/gomount.conf"
@@ -33,11 +25,18 @@ const (
 	ver           = "v1.1"
 )
 
-// Flags
+// struct to store server data
+type server struct {
+	Name string
+	Mnt  string
+	Host string
+	Port string
+}
+
+// Initialise and parse flags
 var flagVerbosity = flag.Bool("v", false, "Increased verbosity by showing errors.")
 var flagTimeout = flag.Int("t", 150, "Change default timeout for ping (150 ms).")
 
-// Parse flags
 func init() {
 	flag.Usage = func() {
 		fmt.Printf("\nUSAGE:\n  %s [OPTIONS]\n\nOPTIONS:\n", os.Args[0])
@@ -125,7 +124,8 @@ func goping(protocole string, host string, port string, t time.Duration) error {
 	return err
 }
 
-// readConfig validates and process the config file.
+// readConfig validate and process the config file.
+// If no errors, a []server list of host is returned
 func readConfig(confFile string) ([]server, error) {
 	var hosts []server
 	var lineNumber int
