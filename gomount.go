@@ -1,80 +1,97 @@
 // Package gomount mounts remote servers on local mount points defined in `fstab`
 // Mount points are read from a user config file. Run `$ gomount -h` for more details.
-//
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"os/exec"
-	"path"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"gopkg.in/yaml.v2"
 )
 
 // Path to config file, mount info file and version number
 const (
-	confFile      = "/home/jeanluc/.config/gomount/gomount.conf"
+	confFile      = "/home/jeanluc/.config/gomount/gomount.yaml"
 	mountInfoFile = "/proc/self/mountinfo"
-	ver           = "v1.1"
+	ver           = "v1.2"
 )
 
-// struct to store server data
-type server struct {
-	Name string
-	Mnt  string
+// struct to store values of a single server
+type Srv struct {
 	Host string
+	Name string
+	Path string
 	Port string
 }
 
-// Initialise and parse flags
-var flagVerbosity = flag.Bool("v", false, "Increased verbosity by showing errors.")
-var flagTimeout = flag.Int("t", 150, "Change default timeout for ping (150 ms).")
-
-func init() {
-	flag.Usage = func() {
-		fmt.Printf("\nUSAGE:\n  %s [OPTIONS]\n\nOPTIONS:\n", os.Args[0])
-		flag.PrintDefaults()
-		fmt.Printf("  -h    This help\n\n")
-	}
-	flag.Parse()
+// struct to store server data from config file
+type Config struct {
+	Server []struct {
+		Host string `yaml:"host"`
+		Name string `yaml:"name"`
+		Path string `yaml:"path"`
+		Port string `yaml:"port"`
+	} `yaml:"Servers"`
 }
 
+// https://zetcode.com/golang/terminal-colour/
+// https://stackoverflow.com/questions/4842424/list-of-ansi-color-escape-sequences
+const (
+	cReset = "\033[0m"
+	cRed   = "\033[31m"
+	// cRed = "\033[38;2;255;0;0m"
+	cGreen = "\033[32m"
+	// cGreen = "\033[38;2;0;255;0m"
+)
+
+// Initialise and parse flags
+var flagVerbosity = flag.Bool("v", false, "Increased verbosity.")
+var flagTimeout = flag.Int("t", 150, "Change default timeout for ping (150 ms).")
+
 func main() {
+
+	flag.Parse()
+
 	startTime := time.Now()
 
-	// open, read and validate config file. If err, show error and terminate main()
-	// if no errors, store all config fields in a []server struct
-	hosts, err := readConfig(confFile)
+	// var to store the unmarshalled config's
+	var configs Config
+
+	// Read yaml config file
+	yamlFile, err := os.ReadFile(confFile)
 	if err != nil {
-		fmt.Printf("\n %s\n\n", err)
-		return
+		log.Fatalf("yamlFile.Get err   #%v ", err)
 	}
+	// Parse config file
+	err = yaml.Unmarshal(yamlFile, &configs)
 
 	// Get list of already mounted hosts
-	m, err := ioutil.ReadFile(mountInfoFile)
+	m, err := os.ReadFile(mountInfoFile)
 	if err != nil {
-		fmt.Printf("\n Could not find: %s\n Check the path and file name in the const block.\n\n", mountInfoFile)
-		return
+		log.Fatalf("\n Could not find: %s\n Check the path and file name in the const block.\n\n", mountInfoFile)
 	}
 	mountInfo := string(m)
 
-	// launch processes in goroutines
-	fmt.Println()
+	// mount servers in goroutines
 	var wg sync.WaitGroup
-	for _, srv := range hosts {
+
+	for i := range configs.Server {
+		server := configs.Server[i]
+		srv := Srv{server.Host, server.Name, server.Path, server.Port}
+
 		wg.Add(1)
-		go func(srv server) {
+		go func(srv Srv) {
 			defer wg.Done()
 
 			// already mounted in /proc/self/mountinfo --> exit goroutine
-			if strings.Contains(mountInfo, srv.Mnt) {
+			if strings.Contains(mountInfo, srv.Path) {
 				fmt.Printf("%-20s %-15s\n", srv.Name, "already mounted")
 				return
 			}
@@ -86,36 +103,31 @@ func main() {
 				if *flagVerbosity {
 					errMsg = err.Error()
 				}
-				fmt.Printf("%-20s %-16s\n", srv.Name, errMsg)
+				fmt.Printf("%s%-20s %-16s%s\n", cRed, srv.Name, errMsg, cReset)
 				return
 			}
 
 			// execute the mount(8)
-			cmd := exec.Command("mount", srv.Mnt)
+			cmd := exec.Command("mount", srv.Path)
 			output, err := cmd.CombinedOutput()
 			if err != nil {
 				errMsg := "mount error (increase verbosity with option -v)"
 				if *flagVerbosity {
-					// remove \n from output
-					errMsg = string(output[:len(output)-1])
+					errMsg = strings.TrimRight(string(output), "\n")
 				}
-				fmt.Printf("%-20s %-16s\n", srv.Name, errMsg)
-			} else {
-				fmt.Printf("%-20s mounted\n", srv.Name)
+				fmt.Printf("%s%-20s %-16s%s\n", cRed, srv.Name, errMsg, cReset)
+				return
 			}
-		}(srv)
+			fmt.Printf("%-20s mounted\n", srv.Name)
 
+		}(srv)
 	}
-	// Wait for all the routines to finish
 	wg.Wait()
 
 	// print timing
-	fmt.Printf("\n%s %s | %.3f sec.\n\n", path.Base(os.Args[0]), ver, time.Since(startTime).Seconds())
+	programName := filename(os.Args[0])
+	fmt.Printf("\n%s %s | %.3f sec.\n\n", programName, ver, time.Since(startTime).Seconds())
 }
-
-//
-// Functions
-//
 
 // goping http ping to check if a server is up
 func goping(protocole string, host string, port string, t time.Duration) error {
@@ -124,86 +136,7 @@ func goping(protocole string, host string, port string, t time.Duration) error {
 	return err
 }
 
-// readConfig validate and process the config file.
-// If no errors, a []server list of host is returned
-func readConfig(confFile string) ([]server, error) {
-	var hosts []server
-	var lineNumber int
-	var sErr []error
-	var numberedLines string
-
-	// Open and read config file
-	f, err := os.Open(confFile)
-	if err != nil {
-		return hosts, fmt.Errorf("Could not find the config file: %s\n Check the path and file name in the const block", confFile)
-	}
-	defer f.Close()
-
-	// Scan through config file
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		lineNumber++
-		// read line from scanner
-		l := strings.TrimSpace(scanner.Text())
-		numberedLines += fmt.Sprintf("%3d: %s\n", lineNumber, l)
-
-		// skip empty and commented out lines
-		if strings.HasPrefix(l, "#") || l == "" {
-			continue
-		}
-
-		// parse line
-		fields := strings.Split(l, ",")
-
-		// Missing fields
-		if len(fields) < 4 {
-			sErr = append(sErr, fmt.Errorf("%3d: field(s) missing expecting 4 fields, seen %d", lineNumber, len(fields)))
-			continue
-		}
-		// empty fields
-		if fields[0] == "" || fields[1] == "" || fields[2] == "" || fields[3] == "" {
-			sErr = append(sErr, fmt.Errorf("%3d: field(s) missing or empty. Need 4 fields", lineNumber))
-			continue
-		}
-		// mount point not a dir
-		if _, err := os.Stat(fields[1]); os.IsNotExist(err) {
-			sErr = append(sErr, fmt.Errorf("%3d: \"%s\" mount point is not a dir", lineNumber, fields[1]))
-			continue
-		}
-		// port to ping not int number
-		if _, err := strconv.Atoi(fields[3]); err != nil {
-			sErr = append(sErr, fmt.Errorf("%3d: port number empty or not valid: \"%s\" not numerical", lineNumber, fields[3]))
-			continue
-		}
-
-		// No error for this line. Store fields in a []server struct and loop for next line
-		if len(sErr) == 0 {
-			hosts = append(hosts, server{
-				Name: fields[0],
-				Mnt:  fields[1],
-				Host: fields[2],
-				Port: fields[3],
-			})
-		}
-
-	}
-
-	// if errors were seen in above loop, print them along with config file if verbosity option -v (verbosity) is set
-	if len(sErr) > 0 {
-		if *flagVerbosity {
-			var e string
-			for _, v := range sErr {
-				e += fmt.Sprintf("%v\n", v)
-			}
-			return hosts, fmt.Errorf("\n%s\nErrors:\n%s", numberedLines, e)
-
-		}
-		return hosts, fmt.Errorf("error reading config file, aborting. Use option -v to show error(s)")
-	}
-
-	if len(hosts) == 0 {
-		return hosts, fmt.Errorf("No hosts found in config file. Nothing to mount")
-	}
-
-	return hosts, nil
+func filename(path string) string {
+	pos := strings.LastIndex(path, "/")
+	return path[pos+1:]
 }
