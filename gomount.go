@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -46,9 +47,7 @@ type Config struct {
 const (
 	cReset = "\033[0m"
 	cRed   = "\033[31m"
-	// cRed = "\033[38;2;255;0;0m"
 	cGreen = "\033[32m"
-	// cGreen = "\033[38;2;0;255;0m"
 )
 
 // Initialise and parse flags
@@ -84,7 +83,7 @@ func main() {
 
 	for i := range configs.Server {
 		server := configs.Server[i]
-		srv := Srv{server.Host, server.Name, server.Path, server.Port}
+		srv := &Srv{server.Host, server.Name, server.Path, server.Port}
 
 		wg.Add(1)
 		go func(srv Srv) {
@@ -97,7 +96,7 @@ func main() {
 			}
 
 			// host is not responding on TCP probe --> exit goroutine
-			err := goping("tcp", srv.Host, srv.Port, time.Duration(*flagTimeout))
+			err := goping("tcp", &srv.Host, &srv.Port, time.Duration(*flagTimeout))
 			if err != nil {
 				errMsg := "not responding"
 				if *flagVerbosity {
@@ -120,19 +119,24 @@ func main() {
 			}
 			fmt.Printf("%-20s mounted\n", srv.Name)
 
-		}(srv)
+		}(*srv)
 	}
 	wg.Wait()
 
 	// print timing
-	programName := filename(os.Args[0])
-	fmt.Printf("\n%s %s | %.3f sec.\n\n", programName, ver, time.Since(startTime).Seconds())
+	fmt.Printf(
+		"\n%s %s compiled with %s | %.3f sec.\n\n",
+		filename(os.Args[0]),
+		ver,
+		runtime.Version(),
+		time.Since(startTime).Seconds(),
+	)
 }
 
 // goping http ping to check if a server is up
-func goping(protocole string, host string, port string, t time.Duration) error {
+func goping(protocole string, host *string, port *string, t time.Duration) error {
 	t = time.Duration(t * time.Millisecond)
-	_, err := net.DialTimeout(protocole, host+":"+port, t)
+	_, err := net.DialTimeout(protocole, *host+":"+*port, t)
 	return err
 }
 
