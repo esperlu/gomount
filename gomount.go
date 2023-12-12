@@ -79,7 +79,6 @@ func main() {
 
 	for i := range config.Servers {
 		server := &config.Servers[i]
-		// srv := &Srv{server.Host, server.Name, server.Path, server.Port}
 
 		wg.Add(1)
 		go func(server Server) {
