@@ -8,23 +8,28 @@ This go program executes  `exec.Command(mount(8))` rather than the `mount(2)` us
 Linux only. Could possibly also work on OS-X. Not tested.
 
 ## config file
-You first need to make a config file and set its full access path/name into the constant `confFile` around line 32 of the code.
+You first need to make a YAML config file and set its full access path/name into the constant `confFile` in the Go code.
 
-It consists of 4 fields, comma separated lines with the following pattern:
-```
-[short name],[mount point as defined in fstab],[host name or IP address],[port to ping]
-```
-Commented out lines will be ignored and config file will be tested for validity at run time.
 
 ### config file example
-```
-arsule-jeanluc,/home/jeanluc/my-mnt/arsule_jeanluc,arsule,221
-# This is a comment
-arsule-web,/home/jeanluc/my-mnt/arsule_web,arsule,221
-rpi-2,/home/jeanluc/my-mnt/rpi_2,rpi_2,22
-ubnt,/home/jeanluc/my-mnt/ubnt,192.168.0.201,2211
 
-```
+    Servers:
+
+    - name: rpi-2
+    path: /home/jeanluc/my-mnt/rpi_2
+    host: 192.168.10.55
+    port: 22
+
+    - name: arsule-jeanluc
+    path: /home/jeanluc/my-mnt/arsule_jeanluc
+    host: arsule
+    port: 22
+
+    - name: arsule-web
+    path: /home/jeanluc/my-mnt/arsule_web
+    host: arsule
+    port: 22
+
 
 ## Usage
 `$ gomount [options]`

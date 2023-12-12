@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // Path to config file, mount info file and version number
@@ -24,22 +24,15 @@ const (
 	ver           = "v1.2"
 )
 
-// struct to store values of a single server
-type Srv struct {
-	Host string
-	Name string
-	Path string
-	Port string
+type Server struct {
+	Name string `yaml:"name"`
+	Path string `yaml:"path"`
+	Host string `yaml:"host"`
+	Port string `yaml:"port"`
 }
 
-// struct to store server data from config file
 type Config struct {
-	Server []struct {
-		Host string `yaml:"host"`
-		Name string `yaml:"name"`
-		Path string `yaml:"path"`
-		Port string `yaml:"port"`
-	} `yaml:"Servers"`
+	Servers []Server `yaml:"Servers"`
 }
 
 // https://zetcode.com/golang/terminal-colour/
@@ -58,10 +51,10 @@ func main() {
 
 	flag.Parse()
 
-	startTime := time.Now()
+	var startTime = time.Now()
 
 	// var to store the unmarshalled config's
-	var configs Config
+	var config Config
 
 	// Read yaml config file
 	yamlFile, err := os.ReadFile(confFile)
@@ -69,57 +62,60 @@ func main() {
 		log.Fatalf("yamlFile.Get err   #%v ", err)
 	}
 	// Parse config file
-	err = yaml.Unmarshal(yamlFile, &configs)
+	err = yaml.Unmarshal(yamlFile, &config)
+
+	// fmt.Printf("Servers:\n%+v\n", config.Servers)
 
 	// Get list of already mounted hosts
 	m, err := os.ReadFile(mountInfoFile)
 	if err != nil {
 		log.Fatalf("\n Could not find: %s\n Check the path and file name in the const block.\n\n", mountInfoFile)
 	}
+
 	mountInfo := string(m)
 
 	// mount servers in goroutines
 	var wg sync.WaitGroup
 
-	for i := range configs.Server {
-		server := configs.Server[i]
-		srv := &Srv{server.Host, server.Name, server.Path, server.Port}
+	for i := range config.Servers {
+		server := &config.Servers[i]
+		// srv := &Srv{server.Host, server.Name, server.Path, server.Port}
 
 		wg.Add(1)
-		go func(srv Srv) {
+		go func(server Server) {
 			defer wg.Done()
 
 			// already mounted in /proc/self/mountinfo --> exit goroutine
-			if strings.Contains(mountInfo, srv.Path) {
-				fmt.Printf("%-20s %-15s\n", srv.Name, "already mounted")
+			if strings.Contains(mountInfo, server.Path) {
+				fmt.Printf("%-20s %-15s\n", server.Name, "already mounted")
 				return
 			}
 
 			// host is not responding on TCP probe --> exit goroutine
-			err := goping("tcp", &srv.Host, &srv.Port, time.Duration(*flagTimeout))
+			err := goping("tcp", &server.Host, &server.Port, time.Duration(*flagTimeout))
 			if err != nil {
 				errMsg := "not responding"
 				if *flagVerbosity {
 					errMsg = err.Error()
 				}
-				fmt.Printf("%s%-20s %-16s%s\n", cRed, srv.Name, errMsg, cReset)
+				fmt.Printf("%s%-20s %-16s%s\n", cRed, server.Name, errMsg, cReset)
 				return
 			}
 
 			// execute the mount(8)
-			cmd := exec.Command("mount", srv.Path)
+			cmd := exec.Command("mount", server.Path)
 			output, err := cmd.CombinedOutput()
 			if err != nil {
 				errMsg := "mount error (increase verbosity with option -v)"
 				if *flagVerbosity {
 					errMsg = strings.TrimRight(string(output), "\n")
 				}
-				fmt.Printf("%s%-20s %-16s%s\n", cRed, srv.Name, errMsg, cReset)
+				fmt.Printf("%s%-20s %-16s%s\n", cRed, server.Name, errMsg, cReset)
 				return
 			}
-			fmt.Printf("%-20s mounted\n", srv.Name)
+			fmt.Printf("%-20s mounted\n", server.Name)
 
-		}(*srv)
+		}(*server)
 	}
 	wg.Wait()
 
