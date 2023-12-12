@@ -64,8 +64,6 @@ func main() {
 	// Parse config file
 	err = yaml.Unmarshal(yamlFile, &config)
 
-	// fmt.Printf("Servers:\n%+v\n", config.Servers)
-
 	// Get list of already mounted hosts
 	m, err := os.ReadFile(mountInfoFile)
 	if err != nil {
