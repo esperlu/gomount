@@ -16,19 +16,19 @@ You first need to make a YAML config file and set its full access path/name into
     Servers:
 
     - name: rpi-2
-    path: /home/jeanluc/my-mnt/rpi_2
-    host: 192.168.10.55
-    port: 22
+      path: /home/jeanluc/my-mnt/rpi_2
+      host: 192.168.10.55
+      port: 22
 
     - name: arsule-jeanluc
-    path: /home/jeanluc/my-mnt/arsule_jeanluc
-    host: arsule
-    port: 22
+      path: /home/jeanluc/my-mnt/arsule_jeanluc
+      host: arsule
+      port: 22
 
     - name: arsule-web
-    path: /home/jeanluc/my-mnt/arsule_web
-    host: arsule
-    port: 22
+      path: /home/jeanluc/my-mnt/arsule_web
+      host: arsule
+      port: 22
 
 
 ## Usage
