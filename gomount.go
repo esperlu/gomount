@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -74,6 +75,7 @@ func main() {
 
 	// mount servers in goroutines
 	var wg sync.WaitGroup
+	ch := make(chan string, len(config.Servers))
 
 	for i := range config.Servers {
 		server := &config.Servers[i]
@@ -82,9 +84,11 @@ func main() {
 		go func(server Server) {
 			defer wg.Done()
 
+			outputString := ""
 			// already mounted in /proc/self/mountinfo --> exit goroutine
 			if strings.Contains(mountInfo, server.Path) {
-				fmt.Printf("%-20s %-15s\n", server.Name, "already mounted")
+				outputString += fmt.Sprintf("%-20s %-15s\n", server.Name, "already mounted")
+				ch <- outputString
 				return
 			}
 
@@ -95,7 +99,8 @@ func main() {
 				if *flagVerbosity {
 					errMsg = err.Error()
 				}
-				fmt.Printf("%s%-20s %-16s%s\n", cRed, server.Name, errMsg, cReset)
+				outputString += fmt.Sprintf("%s%-20s %-16s%s\n", cRed, server.Name, errMsg, cReset)
+				ch <- outputString
 				return
 			}
 
@@ -107,14 +112,31 @@ func main() {
 				if *flagVerbosity {
 					errMsg = strings.TrimRight(string(output), "\n")
 				}
-				fmt.Printf("%s%-20s %-16s%s\n", cRed, server.Name, errMsg, cReset)
+				outputString += fmt.Sprintf("%s%-20s %-16s%s\n", cRed, server.Name, errMsg, cReset)
+				ch <- outputString
 				return
 			}
-			fmt.Printf("%-20s mounted\n", server.Name)
-
+			outputString += fmt.Sprintf("%-20s mounted\n", server.Name)
+			ch <- outputString
 		}(*server)
 	}
 	wg.Wait()
+	close(ch)
+
+	// Read channel
+	var values []string
+	for val := range ch {
+		values = append(values, val)
+	}
+
+	// Sort the output to preserve the arguments order
+	sort.Strings(values)
+
+	// Print final output (omitting the int used to sort the args)
+	fmt.Print("\n")
+	for _, value := range values {
+		fmt.Print(value)
+	}
 
 	// print timing
 	fmt.Printf(
